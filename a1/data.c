@@ -9,6 +9,7 @@
 #include <stdbool.h> /* Needed for boolean datatype */
 #include <math.h>
 #include <string.h>
+#include <pthread.h>
 
 /* added scale and threads to allow command line controls */
 /* scale controls how many times the height and width will increase */
@@ -68,7 +69,21 @@ typedef struct
 	colour intensity;
 } light;
 
-void renderPX(int x, int y, unsigned char *px, ray *r, sphere *spheres, material *materials, light *lights);
+typedef struct data 
+{
+	int startX;
+	int startY;
+	int endX;
+	int endY;
+
+	unsigned char *img;
+	sphere *spheres;
+	material *materials;
+	light *lights;
+} Data;
+
+void* renderChunk(void *params);
+void renderPX(int x, int y, unsigned char *px, sphere *spheres, material *materials, light *lights);
 
 /* Subtract two vectors and return the resulting vector */
 vector vectorSub(vector *v1, vector *v2)
@@ -100,7 +115,6 @@ vector vectorAdd(vector *v1, vector *v2)
 /* Check if the ray and sphere intersect */
 bool intersectRaySphere(ray *r, sphere *s, float *t)
 {
-
 	bool retval = false;
 
 	/* A = d.d, the vector dot product of the direction */
@@ -198,9 +212,6 @@ void readArgs(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-
-	ray r;
-
 	readArgs(argc, argv);
 
 	material materials[3];
@@ -266,21 +277,40 @@ int main(int argc, char *argv[])
 	unsigned char *img;
 	img = malloc(sizeof(char) * (3 * WIDTH * HEIGHT));
 
-	int x, y;
+	int chunkHeight = HEIGHT/threads;
+
+	pthread_t threadPool[threads];
+	int flag[threads];
+	Data threadData[threads];
 
 	/*** start timing here ****/
 
-	for (y = 0; y < HEIGHT; y++)
+	for (int t = 0; t < threads; t++) 
 	{
-		for (x = 0; x < WIDTH; x++)
+		//spawn thread to render chunk
+		threadData[t].startX = 0; 
+		threadData[t].endX = WIDTH;
+		threadData[t].startY = t*chunkHeight;
+		threadData[t].endY = (t+1)*chunkHeight;
+		threadData[t].spheres = spheres;
+		threadData[t].materials = materials;
+		threadData[t].lights = lights;		
+		threadData[t].img = img;
+
+		int sts = pthread_create(&threadPool[t], NULL, renderChunk, &threadData[t]);
+		flag[t] = 1;
+		if (sts)
 		{
-			unsigned char px[3];
-			renderPX(x, y, px, &r, spheres, materials, lights);
-			img[(x + y * WIDTH) * 3 + 0] = px[0];
-			img[(x + y * WIDTH) * 3 + 1] = px[1];
-			img[(x + y * WIDTH) * 3 + 2] = px[2];
+			printf("Error creating thread\n");
+			flag[t] = 0;
 		}
 	}
+
+	for (int t = 0; t < threads; t++) 
+		if (flag[t])
+		{
+			pthread_join(threadPool[t], NULL);
+		}
 
 	/*** end timing here ***/
 
@@ -291,14 +321,22 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-//Ray r
-//spheres
-//materials
-//lights
+void* renderChunk(void* params) {
+	Data* data = (Data*)params;
+	for (int y = data->startY; y < data->endY; y++)
+	{
+		for (int x = data->startX; x < data->endX; x++) {
+			unsigned char px[3];
+			renderPX(x, y, px, data->spheres, data->materials, data->lights);
+			data->img[(x + y * WIDTH) * 3 + 0] = px[0];
+			data->img[(x + y * WIDTH) * 3 + 1] = px[1];
+			data->img[(x + y * WIDTH) * 3 + 2] = px[2];
+		}
+	}
+}
 
-void renderPX(int x, int y, unsigned char *px, ray *r, sphere *spheres, material *materials, light *lights)
+void renderPX(int x, int y, unsigned char *px, sphere *spheres, material *materials, light *lights)
 {
-
 	float red = 0;
 	float green = 0;
 	float blue = 0;
@@ -306,13 +344,15 @@ void renderPX(int x, int y, unsigned char *px, ray *r, sphere *spheres, material
 	int level = 0;
 	float coef = 1.0;
 
-	r->start.x = x;
-	r->start.y = y;
-	r->start.z = -2000;
+	ray r;
 
-	r->dir.x = 0;
-	r->dir.y = 0;
-	r->dir.z = 1;
+	r.start.x = x;
+	r.start.y = y;
+	r.start.z = -2000;
+
+	r.dir.x = 0;
+	r.dir.y = 0;
+	r.dir.z = 1;
 
 	do
 	{
@@ -323,14 +363,13 @@ void renderPX(int x, int y, unsigned char *px, ray *r, sphere *spheres, material
 		unsigned int i;
 		for (i = 0; i < 3; i++)
 		{
-			if (intersectRaySphere(r, &spheres[i], &t))
+			if (intersectRaySphere(&r, &spheres[i], &t))
 				currentSphere = i;
 		}
 		if (currentSphere == -1)
 			break;
-
-		vector scaled = vectorScale(t, &r->dir);
-		vector newStart = vectorAdd(&r->start, &scaled);
+		vector scaled = vectorScale(t, &r.dir);
+		vector newStart = vectorAdd(&r.start, &scaled);
 
 		/* Find the normal for this new vector at the point of intersection */
 		vector n = vectorSub(&newStart, &spheres[currentSphere].pos);
@@ -338,6 +377,7 @@ void renderPX(int x, int y, unsigned char *px, ray *r, sphere *spheres, material
 		if (temp == 0)
 			break;
 
+		
 		temp = 1.0f / sqrtf(temp);
 		n = vectorScale(temp, &n);
 
@@ -384,15 +424,14 @@ void renderPX(int x, int y, unsigned char *px, ray *r, sphere *spheres, material
 		coef *= currentMat.reflection;
 
 		/* The reflected ray start and direction */
-		r->start = newStart;
-		float reflect = 2.0f * vectorDot(&r->dir, &n);
+		r.start = newStart;
+		float reflect = 2.0f * vectorDot(&r.dir, &n);
 		vector tmp = vectorScale(reflect, &n);
-		r->dir = vectorSub(&r->dir, &tmp);
+		r.dir = vectorSub(&r.dir, &tmp);
 
 		level++;
 
 	} while ((coef > 0.0f) && (level < 15));
-
 	px[0] = (unsigned char)min(red * 255.0f, 255.0f);
 	px[1] = (unsigned char)min(green * 255.0f, 255.0f);
 	px[2] = (unsigned char)min(blue * 255.0f, 255.0f);
