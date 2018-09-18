@@ -1,4 +1,4 @@
-
+#define _POSIX_C_SOURCE 199309L
 /* The original ray tracing code was taken from the web site:
     https://www.purplealienplanet.com/node/23 */
 
@@ -9,7 +9,8 @@
 #include <stdbool.h> /* Needed for boolean datatype */
 #include <math.h>
 #include <string.h>
-
+#include <unistd.h>
+#include <time.h>
 	/* added scale and threads to allow command line controls */
 	/* scale controls how many times the height and width will increase */
 	/* threads is used to indicate how many threads should be created */
@@ -247,6 +248,10 @@ int main(int argc, char *argv[]){
    int x, y;
 
 	/*** start timing here ****/
+      struct timespec start, finish;
+	double elapsed;
+
+	clock_gettime(CLOCK_MONOTONIC, &start);  
 
    for(y=0;y<HEIGHT;y++){
       for(x=0;x<WIDTH;x++){
@@ -343,6 +348,13 @@ int main(int argc, char *argv[]){
    }
 
       /*** end timing here ***/
+      clock_gettime(CLOCK_MONOTONIC, &finish);
+
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+
+    printf("time taken: %lf\n", elapsed);
+
    
 	/* only create output file image.ppm when -o is included on command line */
    if (output != 0)

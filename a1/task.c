@@ -11,6 +11,7 @@
 #include <math.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 #include <time.h>
 
 /* added scale and threads to allow command line controls */
@@ -22,6 +23,8 @@ int threads = 1;
 /* change to 1 to create output image file image.ppm */
 /* using the -o on the command line sets output==1 (creates the file) */
 int output = 0;
+
+pthread_mutex_t hitMutex;
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -71,21 +74,14 @@ typedef struct
 	colour intensity;
 } light;
 
-typedef struct data 
+typedef struct 
 {
-	int startX;
-	int startY;
-	int endX;
-	int endY;
+	int* hitMap;
+	sphere* spheres;
+} PreData;
 
-	unsigned char *img;
-	sphere *spheres;
-	material *materials;
-	light *lights;
-} Data;
-
-void* renderChunk(void *params);
-void renderPX(int x, int y, unsigned char *px, sphere *spheres, material *materials, light *lights);
+void renderPX(int x, int y, unsigned char *px, ray *r, sphere *spheres, material *materials, light *lights);
+void* preCheck(void* data);
 
 /* Subtract two vectors and return the resulting vector */
 vector vectorSub(vector *v1, vector *v2)
@@ -117,6 +113,7 @@ vector vectorAdd(vector *v1, vector *v2)
 /* Check if the ray and sphere intersect */
 bool intersectRaySphere(ray *r, sphere *s, float *t)
 {
+
 	bool retval = false;
 
 	/* A = d.d, the vector dot product of the direction */
@@ -214,6 +211,9 @@ void readArgs(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+
+	ray r;
+
 	readArgs(argc, argv);
 
 	material materials[3];
@@ -279,52 +279,69 @@ int main(int argc, char *argv[])
 	unsigned char *img;
 	img = malloc(sizeof(char) * (3 * WIDTH * HEIGHT));
 
-	int chunkHeight = HEIGHT/threads;
-
-	pthread_t threadPool[threads];
-	int flag[threads];
-	Data threadData[threads];
+	int x, y;
+	int* hitMap = malloc(sizeof(int)*WIDTH*HEIGHT);
+	memset(hitMap, 0, sizeof(hitMap[0]) * WIDTH * HEIGHT);
+	if (pthread_mutex_init(&hitMutex, NULL) != 0)
+    {
+        printf("\n mutex init failed\n");
+		free(img);
+		free(hitMap);
+        return 1;
+    }	
 
 	/*** start timing here ****/
 	struct timespec start, finish;
 	double elapsed;
-
 	clock_gettime(CLOCK_MONOTONIC, &start);
 
-	for (int t = 0; t < threads; t++) 
-	{
-		//spawn thread to render chunk
-		threadData[t].startX = 0; 
-		threadData[t].endX = WIDTH;
-		threadData[t].startY = t*chunkHeight;
-		threadData[t].endY = (t+1)*chunkHeight;
-		threadData[t].spheres = spheres;
-		threadData[t].materials = materials;
-		threadData[t].lights = lights;		
-		threadData[t].img = img;
+	PreData data;
+	data.spheres = spheres;
+	data.hitMap = hitMap;
 
-		int sts = pthread_create(&threadPool[t], NULL, renderChunk, &threadData[t]);
-		flag[t] = 1;
-		if (sts)
+	pthread_t preThread;
+	if (threads > 1)
+		if (pthread_create(&preThread, NULL, preCheck, &data))
 		{
-			printf("Error creating thread\n");
-			flag[t] = 0;
+			printf("Error creating pre thread thread\n");
+		}
+
+	int skipped = 0;
+	for (y = 0; y < HEIGHT; y++)
+	{
+		for (x = 0; x < WIDTH; x++)
+		{
+			pthread_mutex_lock(&hitMutex);
+			int hit = hitMap[x+y*WIDTH];
+			pthread_mutex_unlock(&hitMutex);
+			if (hit < 2) {
+				unsigned char px[3];
+				renderPX(x, y, px, &r, spheres, materials, lights);
+				img[(x + y * WIDTH) * 3 + 0] = px[0];
+				img[(x + y * WIDTH) * 3 + 1] = px[1];
+				img[(x + y * WIDTH) * 3 + 2] = px[2];
+			} else {
+				skipped++;	
+				img[(x+y*WIDTH) * 3 + 0] = 0;
+				img[(x+y*WIDTH) * 3 + 1] = 0;
+				img[(x+y*WIDTH) * 3 + 2] = 0;
+			}
 		}
 	}
-
-	for (int t = 0; t < threads; t++) 
-		if (flag[t])
-		{
-			pthread_join(threadPool[t], NULL);
-		}
 
 	/*** end timing here ***/
 	clock_gettime(CLOCK_MONOTONIC, &finish);
 
-    elapsed = (finish.tv_sec - start.tv_sec);
-    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+	printf("Skipped: %d\n", skipped);
+	
+	elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;	
 
 	printf("time taken: %lf\n", elapsed);
+
+	if (threads > 1)
+		pthread_join(preThread, NULL);
+	pthread_mutex_destroy(&hitMutex);
 
 	/* only create output file image.ppm when -o is included on command line */
 	if (output != 0)
@@ -333,22 +350,45 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void* renderChunk(void* params) {
-	Data* data = (Data*)params;
-	for (int y = data->startY; y < data->endY; y++)
+void* preCheck(void* params) {
+	PreData* data = (PreData*)params;
+	sphere* spheres = data->spheres;
+	int* hitMap = data->hitMap;
+	ray r;
+	r.start.x = 0;
+	r.start.y = 0;
+	r.start.z = -2000;
+
+	r.dir.x = 0;
+	r.dir.y = 0;
+	r.dir.z = 1;
+	int i,x,y;
+	float t = 20000.0f;
+	for (y = 0; y < HEIGHT; y++)
 	{
-		for (int x = data->startX; x < data->endX; x++) {
-			unsigned char px[3];
-			renderPX(x, y, px, data->spheres, data->materials, data->lights);
-			data->img[(x + y * WIDTH) * 3 + 0] = px[0];
-			data->img[(x + y * WIDTH) * 3 + 1] = px[1];
-			data->img[(x + y * WIDTH) * 3 + 2] = px[2];
+		r.start.y = y;
+		for (x = 0; x < WIDTH; x++)
+		{
+			r.start.x = x;
+			t = 20000.0f;
+			int hit = 2;
+			for (i = 0; i < 3; i++)
+			{
+				if (intersectRaySphere(&r, &spheres[i], &t)) {
+					hit = 1;
+					break;
+				}
+			}
+			pthread_mutex_lock(&hitMutex);
+			hitMap[x+y*WIDTH] = hit;
+			pthread_mutex_unlock(&hitMutex);
 		}
 	}
 }
 
-void renderPX(int x, int y, unsigned char *px, sphere *spheres, material *materials, light *lights)
+void renderPX(int x, int y, unsigned char *px, ray *r, sphere *spheres, material *materials, light *lights)
 {
+
 	float red = 0;
 	float green = 0;
 	float blue = 0;
@@ -356,15 +396,13 @@ void renderPX(int x, int y, unsigned char *px, sphere *spheres, material *materi
 	int level = 0;
 	float coef = 1.0;
 
-	ray r;
+	r->start.x = x;
+	r->start.y = y;
+	r->start.z = -2000;
 
-	r.start.x = x;
-	r.start.y = y;
-	r.start.z = -2000;
-
-	r.dir.x = 0;
-	r.dir.y = 0;
-	r.dir.z = 1;
+	r->dir.x = 0;
+	r->dir.y = 0;
+	r->dir.z = 1;
 
 	do
 	{
@@ -375,13 +413,14 @@ void renderPX(int x, int y, unsigned char *px, sphere *spheres, material *materi
 		unsigned int i;
 		for (i = 0; i < 3; i++)
 		{
-			if (intersectRaySphere(&r, &spheres[i], &t))
+			if (intersectRaySphere(r, &spheres[i], &t))
 				currentSphere = i;
 		}
 		if (currentSphere == -1)
 			break;
-		vector scaled = vectorScale(t, &r.dir);
-		vector newStart = vectorAdd(&r.start, &scaled);
+
+		vector scaled = vectorScale(t, &r->dir);
+		vector newStart = vectorAdd(&r->start, &scaled);
 
 		/* Find the normal for this new vector at the point of intersection */
 		vector n = vectorSub(&newStart, &spheres[currentSphere].pos);
@@ -389,7 +428,6 @@ void renderPX(int x, int y, unsigned char *px, sphere *spheres, material *materi
 		if (temp == 0)
 			break;
 
-		
 		temp = 1.0f / sqrtf(temp);
 		n = vectorScale(temp, &n);
 
@@ -398,6 +436,7 @@ void renderPX(int x, int y, unsigned char *px, sphere *spheres, material *materi
 
 		/* Find the value of the light at this point */
 		unsigned int j;
+		//TASK TODO
 		for (j = 0; j < 3; j++)
 		{
 			light currentLight = lights[j];
@@ -415,6 +454,7 @@ void renderPX(int x, int y, unsigned char *px, sphere *spheres, material *materi
 			/* Calculate shadows */
 			bool inShadow = false;
 			unsigned int k;
+			//TASK TODO Maybe
 			for (k = 0; k < 3; ++k)
 			{
 				if (intersectRaySphere(&lightRay, &spheres[k], &t))
@@ -436,14 +476,15 @@ void renderPX(int x, int y, unsigned char *px, sphere *spheres, material *materi
 		coef *= currentMat.reflection;
 
 		/* The reflected ray start and direction */
-		r.start = newStart;
-		float reflect = 2.0f * vectorDot(&r.dir, &n);
+		r->start = newStart;
+		float reflect = 2.0f * vectorDot(&r->dir, &n);
 		vector tmp = vectorScale(reflect, &n);
-		r.dir = vectorSub(&r.dir, &tmp);
+		r->dir = vectorSub(&r->dir, &tmp);
 
 		level++;
 
 	} while ((coef > 0.0f) && (level < 15));
+
 	px[0] = (unsigned char)min(red * 255.0f, 255.0f);
 	px[1] = (unsigned char)min(green * 255.0f, 255.0f);
 	px[2] = (unsigned char)min(blue * 255.0f, 255.0f);
