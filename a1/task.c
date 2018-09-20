@@ -343,6 +343,8 @@ int main(int argc, char *argv[])
 		pthread_join(preThread, NULL);
 	pthread_mutex_destroy(&hitMutex);
 
+	free(hitMap);
+
 	/* only create output file image.ppm when -o is included on command line */
 	if (output != 0)
 		saveppm("image.ppm", img, WIDTH, HEIGHT);
