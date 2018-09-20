@@ -311,9 +311,7 @@ int main(int argc, char *argv[])
 	{
 		for (x = 0; x < WIDTH; x++)
 		{
-			pthread_mutex_lock(&hitMutex);
 			int hit = hitMap[x+y*WIDTH];
-			pthread_mutex_unlock(&hitMutex);
 			if (hit < 2) {
 				unsigned char px[3];
 				renderPX(x, y, px, &r, spheres, materials, lights);
@@ -381,9 +379,7 @@ void* preCheck(void* params) {
 					break;
 				}
 			}
-			pthread_mutex_lock(&hitMutex);
 			hitMap[x+y*WIDTH] = hit;
-			pthread_mutex_unlock(&hitMutex);
 		}
 	}
 }
