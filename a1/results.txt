@@ -1,10 +1,36 @@
+/***********************/
+ * cis3090 A1          *
+ * Name: Nolan Mullins *
+ * Student #: 0939720  *
+/***********************/
 
-All times are in seconds
+Q: Is there a point when number of threads or the scale of 
+the image benefits from the use of Pthreads? 
+
+    For the data parallel program it does seem to keep scaling
+even when using way more threads than there physically are available.
+The performance is significantly boosted when adding in more physical
+cores. Once the physical limit is reached (8 threads) then there are
+just smaller incremental gains which taper off as shown by using 128t.
+
+Q: Is there an image size that is too small to benefit from 
+the use of threads? 
+
+    In this case no. All image scales see benifits from using more
+threads. However there probably is a case if we used a float scale 
+and looked at a much smaller image.
+
+Q: Is task parallelism beneficial for this problem?
+
+    Not really, I tried multiple things and in the end improved the
+performance over ray.c with the use of one extra core. I looked at 
+other ways to utilize more cores but none improved performance. 
 
 -----------------------------------
 Hardware used
 -----------------------------------
-    CPU: i7 4790k @ 4.30 GHz
+    CPU: i7 4790k @ 4.30 GHz 4 cores 8 Threads
+    RAM: 16GB ddr3 in duel channel
 -----------------------------------
 
 -------------- ray.c --------------
@@ -18,14 +44,14 @@ Scale
    32       59.511
 
 -------------- data.c --------------
-Threads		1	    2	    4       8       16      32	
+Threads		1	    2	    4       8       16      32	    128
 Scale
-   1        0.085   0.044   0.031   0.023   0.019   0.018  
-   2        0.333   0.172   0.138   0.083   0.080   0.069
-   4        1.336   0.681   0.538   0.332   0.280   0.257
-   8        5.465   2.711   1.998   1.406   1.120   1.052
-   16       21.865  10.982  8.108   5.448   4.462   4.183
-   32       63.651  32.371  21.050  14.272  12.512  11.959
+   1        0.085   0.044   0.031   0.023   0.019   0.018   0.021
+   2        0.333   0.172   0.138   0.083   0.080   0.069   0.068
+   4        1.336   0.681   0.538   0.332   0.280   0.257   0.258
+   8        5.465   2.711   1.998   1.406   1.120   1.052   1.024
+   16       21.865  10.982  8.108   5.448   4.462   4.183   3.975
+   32       63.651  32.371  21.050  14.272  12.512  11.959  11.617
 
 -------------- task.c --------------
 Threads		1	    2	    4       8       12      16	
@@ -36,3 +62,5 @@ Scale
    8        5.507   3.570
    16       21.972  14.288
    32       62.838  41.919
+
+   *All times are in seconds
