@@ -282,13 +282,6 @@ int main(int argc, char *argv[])
 	int x, y;
 	int* hitMap = malloc(sizeof(int)*WIDTH*HEIGHT);
 	memset(hitMap, 0, sizeof(hitMap[0]) * WIDTH * HEIGHT);
-	if (pthread_mutex_init(&hitMutex, NULL) != 0)
-    {
-        printf("\n mutex init failed\n");
-		free(img);
-		free(hitMap);
-        return 1;
-    }	
 
 	/*** start timing here ****/
 	struct timespec start, finish;
@@ -300,26 +293,25 @@ int main(int argc, char *argv[])
 	data.hitMap = hitMap;
 
 	pthread_t preThread;
+	//If there is an extra thread use it to pre check for ray collisions
 	if (threads > 1)
 		if (pthread_create(&preThread, NULL, preCheck, &data))
 		{
 			printf("Error creating pre thread thread\n");
 		}
 
-	int skipped = 0;
 	for (y = 0; y < HEIGHT; y++)
 	{
 		for (x = 0; x < WIDTH; x++)
 		{
-			int hit = hitMap[x+y*WIDTH];
-			if (hit < 2) {
+			//If the px hasn't been processed or collides with a sphere
+			if (hitMap[x+y*WIDTH] != 2) {
 				unsigned char px[3];
 				renderPX(x, y, px, &r, spheres, materials, lights);
 				img[(x + y * WIDTH) * 3 + 0] = px[0];
 				img[(x + y * WIDTH) * 3 + 1] = px[1];
 				img[(x + y * WIDTH) * 3 + 2] = px[2];
 			} else {
-				skipped++;	
 				img[(x+y*WIDTH) * 3 + 0] = 0;
 				img[(x+y*WIDTH) * 3 + 1] = 0;
 				img[(x+y*WIDTH) * 3 + 2] = 0;
@@ -330,8 +322,6 @@ int main(int argc, char *argv[])
 	/*** end timing here ***/
 	clock_gettime(CLOCK_MONOTONIC, &finish);
 
-	printf("Skipped: %d\n", skipped);
-	
 	elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;	
 
@@ -434,7 +424,6 @@ void renderPX(int x, int y, unsigned char *px, ray *r, sphere *spheres, material
 
 		/* Find the value of the light at this point */
 		unsigned int j;
-		//TASK TODO
 		for (j = 0; j < 3; j++)
 		{
 			light currentLight = lights[j];
@@ -452,7 +441,6 @@ void renderPX(int x, int y, unsigned char *px, ray *r, sphere *spheres, material
 			/* Calculate shadows */
 			bool inShadow = false;
 			unsigned int k;
-			//TASK TODO Maybe
 			for (k = 0; k < 3; ++k)
 			{
 				if (intersectRaySphere(&lightRay, &spheres[k], &t))
