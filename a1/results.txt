@@ -24,7 +24,13 @@ Q: Is task parallelism beneficial for this problem?
 
     Not really, I tried multiple things and in the end improved the
 performance over ray.c with the use of one extra core. I looked at 
-other ways to utilize more cores but none improved performance. 
+other ways to utilize more cores but none improved performance. In 
+the end I used one extra core to run a pre ray collision check to
+identify which pixels needed to actually needed to be rendered. This 
+reduced the work for pre checked pixels as it only had to set their 
+color to black. Overall the extra thread was less efficient then 
+if I were to use it in a data parallel way so I don't think the task
+parallel is very useful.
 
 -----------------------------------
 Hardware used
@@ -56,8 +62,8 @@ Scale
 -------------- task.c --------------
 Threads		1	    2	    4       8       12      16	
 Scale
-   1        0.086   0.056     
-   2        0.350   0.222  
+   1        0.086   0.056      
+   2        0.350   0.222   
    4        1.397   0.090
    8        5.507   3.570
    16       21.972  14.288
