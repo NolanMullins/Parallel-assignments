@@ -21,7 +21,7 @@ void error(char* msg)
 
 int main(int argc, char *argv[])
 {
-    int comm_sz, rank, size; 
+    int comm_sz, rank, size, i, j; 
 
     /* Start up MPI */
     MPI_Init(NULL, NULL);
@@ -39,26 +39,32 @@ int main(int argc, char *argv[])
             exitMPI();
 
     size = strtol(argv[2], NULL, 10); 
-    int A[size];
-    int B[size][size];
-    int C[size];
-    memset(&C, 0, sizeof(int)*size);
+    int* A = malloc(sizeof(int)*size);
+    int* B = malloc(sizeof(int)*size*size);
+    int* C = malloc(sizeof(int)*size);
+    memset(C, 0, sizeof(int)*size);
+
+    //Start timing here
+    struct timespec startTime, finishTime;
+    double elapsed;
+
+    clock_gettime(CLOCK_MONOTONIC, &startTime);
 
     //Generate matrix
     if (rank == 0)
     {
         time_t t;
         srand((unsigned) time(&t));
-        for (int i = 0; i < size; i++)
+        for (i = 0; i < size; i++)
         {
             A[i] = rand() % size;
-            for (int j = 0; j < size; j++)
-                B[i][j] = rand() % 50;
+            for (j = 0; j < size; j++)
+                B[i*size+j] = rand() % 50;
         }
     }
 
-    MPI_Bcast(&A, size, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&B, size*size, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(A, size, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(B, size*size, MPI_INT, 0, MPI_COMM_WORLD);
 
     int numRows = size / comm_sz;
     if (numRows < 1)
@@ -70,24 +76,39 @@ int main(int argc, char *argv[])
 
     //Calculate results
     if (start < size)
-        for (int i = start; i < end; i++)
+        for (i = start; i < end; i++)
         {
             int c = 0;
-            for (int j = 0; j < size; j++)
-                c += A[i]*B[i][j];
+            for (j = 0; j < size; j++)
+                c += A[i]*B[i*size+j];
             C[i] = c;
         }
 
     //join up data
-    int res[size];
-    MPI_Reduce(&C, &res, size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    //int res[size];
+    int* res = malloc(sizeof(int)*size);
+    MPI_Reduce(C, res, size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    //Finish timing
+    clock_gettime(CLOCK_MONOTONIC, &finishTime);
+
+    elapsed = (finishTime.tv_sec - startTime.tv_sec);
+    elapsed += (finishTime.tv_nsec - startTime.tv_nsec) / 1000000000.0;
+
+    if (rank == 0)
+        printf("time taken: %lf\n", elapsed);
 
     if (rank == 0 && output)
     {
-        for (int i = 0; i < size; i++)
+        for (i = 0; i < size; i++)
             printf("%d\t", res[i]);
         printf("\n");
     }
+
+    free(A);
+    free(B);
+    free(C);
+    free(res);
 
     /* Shut down MPI */
     MPI_Finalize();
