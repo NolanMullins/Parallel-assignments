@@ -5,7 +5,8 @@
 #include <ctype.h>
 #include <mpi.h>
 
-#define output 0
+#define output 0 
+#define random 0
 
 void exitMPI()
 {
@@ -17,6 +18,17 @@ void error(char* msg)
 {
     printf("%s\n", msg);
     exitMPI();
+}
+
+void getEndPoints(int rank, int comm_sz, int size, int* start, int* end)
+{
+    int numRows = size / comm_sz;
+    if (numRows < 1)
+        numRows = 1;
+    *start = rank*numRows;
+    *end = (rank+1)*numRows;
+    if (rank == comm_sz - 1)
+        *end = size;
 }
 
 int main(int argc, char *argv[])
@@ -40,8 +52,35 @@ int main(int argc, char *argv[])
 
     size = strtol(argv[2], NULL, 10); 
     int* A = malloc(sizeof(int)*size);
-    int* B = malloc(sizeof(int)*size*size);
+    int* B; 
     int* C = malloc(sizeof(int)*size);
+
+    int start,end;
+    getEndPoints(rank, comm_sz, size, &start, &end);
+
+    //generate
+    if (rank == 0)
+    {
+        B = malloc(sizeof(int)*size*size);
+
+        time_t t;
+        if (random)
+            srand((unsigned) time(&t));
+        else
+            srand(134);
+
+        for (i = 0; i < size; i++)
+        {
+            A[i] = rand() % size;
+            for (j = 0; j < size; j++)
+                B[i*size+j] = rand() % size;
+        }
+    }
+    else
+        B = malloc(sizeof(int)*(end-start)*size);
+        
+    if (A == NULL || B == NULL || C == NULL)
+        error("Malloc returned NULL");
     memset(C, 0, sizeof(int)*size);
 
     //Start timing here
@@ -53,39 +92,31 @@ int main(int argc, char *argv[])
     //Generate matrix
     if (rank == 0)
     {
-        time_t t;
-        srand((unsigned) time(&t));
-        for (i = 0; i < size; i++)
+        int tmpS, tmpE;
+        for (i = 1; i < comm_sz; i++)
         {
-            A[i] = rand() % size;
-            for (j = 0; j < size; j++)
-                B[i*size+j] = rand() % 50;
+            getEndPoints(i, comm_sz, size, &tmpS, &tmpE);
+            MPI_Send(&(B[tmpS*size]), (tmpE-tmpS)*size, MPI_INT, i, 0, MPI_COMM_WORLD);
         }
+    }
+    else
+    {
+        MPI_Recv(B, (end-start)*size, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
     MPI_Bcast(A, size, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(B, size*size, MPI_INT, 0, MPI_COMM_WORLD);
-
-    int numRows = size / comm_sz;
-    if (numRows < 1)
-        numRows = 1;
-    int start = rank*numRows;
-    int end = (rank+1)*numRows;
-    if (rank == comm_sz - 1)
-        end = size;
 
     //Calculate results
     if (start < size)
-        for (i = start; i < end; i++)
+        for (i = 0; i < (end-start); i++)
         {
             int c = 0;
             for (j = 0; j < size; j++)
                 c += A[i]*B[i*size+j];
-            C[i] = c;
+            C[i+start] = c;
         }
 
     //join up data
-    //int res[size];
     int* res = malloc(sizeof(int)*size);
     MPI_Reduce(C, res, size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
