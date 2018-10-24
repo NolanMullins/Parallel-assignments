@@ -6,7 +6,7 @@
 #include <mpi.h>
 
 #define output 0 
-#define random 0
+#define random 1 
 
 void exitMPI()
 {
@@ -31,26 +31,9 @@ void getEndPoints(int rank, int comm_sz, int size, int* start, int* end)
         *end = size;
 }
 
-int main(int argc, char *argv[])
+double run(int size, int comm_sz, int rank)
 {
-    int comm_sz, rank, size, i, j; 
-
-    /* Start up MPI */
-    MPI_Init(NULL, NULL);
-
-    /* Get the number of processes */
-    MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
-
-    /* Get my rank among all the processes */
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    if (argc < 3)
-        if (rank == 0)
-            error("Not enough args");
-        else
-            exitMPI();
-
-    size = strtol(argv[2], NULL, 10); 
+    int i, j;
     int* A = malloc(sizeof(int)*size);
     int* B; 
     int* C = malloc(sizeof(int)*size);
@@ -99,7 +82,7 @@ int main(int argc, char *argv[])
             MPI_Send(&(B[tmpS*size]), (tmpE-tmpS)*size, MPI_INT, i, 0, MPI_COMM_WORLD);
         }
     }
-    else
+    else if (rank < comm_sz)
     {
         MPI_Recv(B, (end-start)*size, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
@@ -107,7 +90,7 @@ int main(int argc, char *argv[])
     MPI_Bcast(A, size, MPI_INT, 0, MPI_COMM_WORLD);
 
     //Calculate results
-    if (start < size)
+    if (start < size && rank < comm_sz)
         for (i = 0; i < (end-start); i++)
         {
             int c = 0;
@@ -126,9 +109,6 @@ int main(int argc, char *argv[])
     elapsed = (finishTime.tv_sec - startTime.tv_sec);
     elapsed += (finishTime.tv_nsec - startTime.tv_nsec) / 1000000000.0;
 
-    if (rank == 0)
-        printf("time taken: %lf\n", elapsed);
-
     if (rank == 0 && output)
     {
         for (i = 0; i < size; i++)
@@ -140,6 +120,68 @@ int main(int argc, char *argv[])
     free(B);
     free(C);
     free(res);
+
+    if (rank == 0)
+        return elapsed;
+}
+
+int main(int argc, char *argv[])
+{
+    int comm_sz, rank, size, i, j, g = 0; 
+    /* Start up MPI */
+    MPI_Init(NULL, NULL);
+    /* Get the number of processes */
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
+    /* Get my rank among all the processes */
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    if (argc < 3)
+        if (rank == 0)
+            error("Not enough args");
+        else
+            exitMPI();
+    if (argc > 3)
+        if (strcmp(argv[3], "-g")==0)
+            g = 1;
+
+    size = strtol(argv[2], NULL, 10); 
+
+    if (g)
+    {
+        if (comm_sz != 4)
+            if (rank == 0)
+                error("need 4 procs"); 
+            else 
+                exitMPI();
+        if (rank == 0)
+        {
+            printf("Size\tProcesses\n");
+            printf("\t\t1\t\t2\t\t3\t\t4\n");
+        }
+        int sizes[] = {100, 1000, 10000, 20000};
+        int i, j;
+        for (i = 0; i < 4; i++)
+        {
+            if (rank == 0)
+                printf("size:%d\t", sizes[i]);
+            for (j = 1; j < 5; j++)
+            {
+                MPI_Barrier(MPI_COMM_WORLD);
+                double time = run(sizes[i], j, rank);
+                if (rank == 0)
+                    printf("%lf\t", time);
+            }
+            if (rank == 0)
+                printf("\n");
+        }
+    }
+    else
+    {
+        double time =  run(size, comm_sz, rank);
+        if (rank == 0)
+            printf("time taken: %lf\n", time);
+    }
+    
 
     /* Shut down MPI */
     MPI_Finalize();

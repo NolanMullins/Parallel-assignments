@@ -4,6 +4,9 @@ all: main.c
 run: 
 	mpiexec -n 4 ./a2 4 1000
 
+runG:
+	mpiexec -n 4 ./a2 4 1 -g
+
 runBig: 
 	mpiexec -n 4 ./a2 4 20000
 
