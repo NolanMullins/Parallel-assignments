@@ -148,9 +148,9 @@ int main(int argc, char *argv[])
 
     if (g)
     {
-        if (comm_sz != 4)
+        if (comm_sz < 4)
             if (rank == 0)
-                error("need 4 procs"); 
+                error("need atleast 4 procs"); 
             else 
                 exitMPI();
         if (rank == 0)
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
         for (i = 0; i < 4; i++)
         {
             if (rank == 0)
-                printf("size:%d\t", sizes[i]);
+                printf("%d\t\t", sizes[i]);
             for (j = 1; j < 5; j++)
             {
                 MPI_Barrier(MPI_COMM_WORLD);
