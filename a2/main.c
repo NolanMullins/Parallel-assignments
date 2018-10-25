@@ -128,6 +128,7 @@ double run(int size, int comm_sz, int rank)
 
     elapsed = (finishTime.tv_sec - startTime.tv_sec);
     elapsed += (finishTime.tv_nsec - startTime.tv_nsec) / 1000000000.0;
+    elapsed *= 1000;
 
     if (rank == 0 && output)
     {
