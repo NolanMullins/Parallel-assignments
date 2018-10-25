@@ -87,6 +87,19 @@ double run(int size, int comm_sz, int rank)
         error("Malloc returned NULL");
     memset(C, 0, sizeof(int)*size);
 
+    //Build communicator
+    int ranks[comm_sz];
+    for (i = 0; i < comm_sz; i++)
+        ranks[i] = i;
+    MPI_Group world;
+    MPI_Comm_group(MPI_COMM_WORLD, &world);
+
+    MPI_Group myGroup;
+    MPI_Group_incl(world, comm_sz, ranks, &myGroup);
+
+    MPI_Comm myComm;
+    MPI_Comm_create_group(MPI_COMM_WORLD, myGroup, 0, &myComm);
+
     //Start timing here
     struct timespec startTime, finishTime;
     double elapsed;
@@ -121,7 +134,21 @@ double run(int size, int comm_sz, int rank)
 
     //join up data
     int* res = malloc(sizeof(int)*size);
-    MPI_Reduce(C, res, size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    //Gotta figure uot fastest way to reduce
+    //if (rank < comm_sz)
+        //MPI_Reduce(C, res, size, MPI_INT, MPI_SUM, 0, myComm);
+    if (rank == 0)
+    {
+        for (i = 1; i < comm_sz; i++)
+        {
+            MPI_Recv(res, size, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+    }
+    else if (rank < comm_sz)
+    {
+        MPI_Request req;
+        MPI_Isend(C, size, MPI_INT, 0, 0, MPI_COMM_WORLD, &req);
+    }
 
     //Finish timing
     clock_gettime(CLOCK_MONOTONIC, &finishTime);
@@ -141,6 +168,8 @@ double run(int size, int comm_sz, int rank)
     free(B);
     free(C);
     free(res);
+
+    
 
     if (rank == 0)
         return elapsed;
