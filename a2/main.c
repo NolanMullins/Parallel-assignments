@@ -6,7 +6,8 @@
 #include <mpi.h>
 
 #define output 0 
-#define random 1 
+#define displayAB 0 
+#define random 0 
 
 void exitMPI()
 {
@@ -31,27 +32,32 @@ void getEndPoints(int rank, int comm_sz, int size, int* start, int* end)
         *end = size;
 }
 
-double run(int size, int comm_sz, int rank)
+void displayMatrix(int* A, int rows, int cols)
+{
+    int i,j;
+    for (i = 0; i < rows; i++)
+    {
+        for (j = 0; j < cols; j++)
+        {
+            printf("%d ", A[i*cols+j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+void generateMatricies(int* A, int* B, int size, int rank, int comm_sz)
 {
     int i, j;
-    int* A = malloc(sizeof(int)*size);
-    int* B; 
-    int* C = malloc(sizeof(int)*size);
-
-    int start,end;
-    getEndPoints(rank, comm_sz, size, &start, &end);
-
-    //generate
-    if (rank == 0)
+    if (random==-1)
+        memset(B, 1, sizeof(int)*size*size);
+    else
     {
-        B = malloc(sizeof(int)*size*size);
-
         time_t t;
         if (random)
             srand((unsigned) time(&t));
         else
-            srand(134);
-
+            srand(124);
         for (i = 0; i < size; i++)
         {
             A[i] = rand() % size;
@@ -59,9 +65,24 @@ double run(int size, int comm_sz, int rank)
                 B[i*size+j] = rand() % size;
         }
     }
+}
+
+double run(int size, int comm_sz, int rank)
+{
+    int start,end, i, j;
+    getEndPoints(rank, comm_sz, size, &start, &end);
+
+    int* A = malloc(sizeof(int)*size);
+    int* B;
+    int* C = malloc(sizeof(int)*size);
+    if (rank == 0)
+        B = malloc(sizeof(int)*size*size);
     else
         B = malloc(sizeof(int)*(end-start)*size);
-        
+
+    if (rank == 0)
+        generateMatricies(A, B, size, rank, comm_sz);
+
     if (A == NULL || B == NULL || C == NULL)
         error("Malloc returned NULL");
     memset(C, 0, sizeof(int)*size);
@@ -72,32 +93,31 @@ double run(int size, int comm_sz, int rank)
 
     clock_gettime(CLOCK_MONOTONIC, &startTime);
 
-    //Generate matrix
+    //send information
     if (rank == 0)
     {
         int tmpS, tmpE;
         for (i = 1; i < comm_sz; i++)
         {
             getEndPoints(i, comm_sz, size, &tmpS, &tmpE);
-            MPI_Send(&(B[tmpS*size]), (tmpE-tmpS)*size, MPI_INT, i, 0, MPI_COMM_WORLD);
+            MPI_Request reqA, reqB;
+            MPI_Isend(&(B[tmpS*size]), (tmpE-tmpS)*size, MPI_INT, i, 0, MPI_COMM_WORLD, &reqA);
+            MPI_Isend(A, size, MPI_INT, i, 0, MPI_COMM_WORLD, &reqB);
         }
     }
     else if (rank < comm_sz)
     {
         MPI_Recv(B, (end-start)*size, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(A, size, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
-    MPI_Bcast(A, size, MPI_INT, 0, MPI_COMM_WORLD);
+    //MPI_Bcast(A, size, MPI_INT, 0, MPI_COMM_WORLD);
 
     //Calculate results
     if (start < size && rank < comm_sz)
-        for (i = 0; i < (end-start); i++)
-        {
-            int c = 0;
+        for (i = start; i < end; i++)
             for (j = 0; j < size; j++)
-                c += A[i]*B[i*size+j];
-            C[i+start] = c;
-        }
+                C[j] += A[i]*B[(i-start)*(size)+j];
 
     //join up data
     int* res = malloc(sizeof(int)*size);
@@ -148,15 +168,12 @@ int main(int argc, char *argv[])
 
     if (g)
     {
-        if (comm_sz < 4)
-            if (rank == 0)
-                error("need atleast 4 procs"); 
-            else 
-                exitMPI();
         if (rank == 0)
         {
             printf("Size\tProcesses\n");
-            printf("\t\t1\t\t2\t\t3\t\t4\n");
+            for (i = 0; i < comm_sz; i++)
+                printf("\t\t%d", i+1);
+            printf("\n");
         }
         int sizes[] = {100, 1000, 10000, 20000};
         int i, j;
@@ -164,7 +181,7 @@ int main(int argc, char *argv[])
         {
             if (rank == 0)
                 printf("%d\t\t", sizes[i]);
-            for (j = 1; j < 5; j++)
+            for (j = 1; j <= comm_sz; j++)
             {
                 MPI_Barrier(MPI_COMM_WORLD);
                 double time = run(sizes[i], j, rank);
