@@ -16,19 +16,19 @@ How to use
 -----------------------------------
     1) make
     2) ./mpiexec -n <count> ./a2 <count> <size> <-g (optional)>
-    3) make runG
+    3) make runG || make run
 
 -----------------------------------
 Notes
 -----------------------------------
-    1) When running with the -g flag the program will run with run from 1 to as many procs given
+    1) When running with the -g flag the program requires at least 4 available processes
     
 
 mpiexec -n 4 ./a2 4 1 -g
 
 Size    Processes
                 1               2               3               4
-100             0.048ms         0.074ms         0.094ms         0.046ms
-1000            3.883ms         7.299ms         3.418ms         3.734ms
-10000           368.489ms       563.557ms       399.404ms       289.278ms
-20000           1528.647ms      2309.792ms      1527.916ms      1209.468ms
+100             0.041ms         0.108ms         0.148ms         0.062ms
+1000            4.660ms         7.014ms         5.006ms         4.534ms
+10000           397.610ms       570.288ms       359.531ms       276.175ms
+20000           1502.264ms      2138.022ms      1490.465ms      1130.948ms

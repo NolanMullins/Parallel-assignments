@@ -186,10 +186,17 @@ int main(int argc, char *argv[])
 
     if (g)
     {
+        if (comm_sz < 4)
+        {
+            if (rank == 0)
+                error("Please pass in 4 processes");
+            else
+                exitMPI();
+        }
         if (rank == 0)
         {
             printf("Size\tProcesses\n");
-            for (i = 0; i < comm_sz; i++)
+            for (i = 0; i < 4; i++)
                 printf("\t\t%d", i+1);
             printf("\n");
         }
@@ -199,7 +206,7 @@ int main(int argc, char *argv[])
         {
             if (rank == 0)
                 printf("%d\t\t", sizes[i]);
-            for (j = 1; j <= comm_sz; j++)
+            for (j = 1; j <= 4; j++)
             {
                 MPI_Barrier(MPI_COMM_WORLD);
                 double time = run(sizes[i], j, rank);
