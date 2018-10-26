@@ -7,7 +7,7 @@
 
 #define output 0 
 #define displayAB 0 
-#define random 0 
+#define random 1 
 
 void exitMPI()
 {
@@ -79,6 +79,7 @@ double run(int size, int comm_sz, int rank)
         B = malloc(sizeof(int)*size*size);
     else
         B = malloc(sizeof(int)*(end-start)*size);
+    int* res = malloc(sizeof(int)*size);
 
     if (rank == 0)
         generateMatricies(A, B, size, rank, comm_sz);
@@ -91,6 +92,7 @@ double run(int size, int comm_sz, int rank)
     int ranks[comm_sz];
     for (i = 0; i < comm_sz; i++)
         ranks[i] = i;
+
     MPI_Group world;
     MPI_Comm_group(MPI_COMM_WORLD, &world);
 
@@ -114,17 +116,15 @@ double run(int size, int comm_sz, int rank)
         {
             getEndPoints(i, comm_sz, size, &tmpS, &tmpE);
             MPI_Request reqA, reqB;
-            MPI_Isend(&(B[tmpS*size]), (tmpE-tmpS)*size, MPI_INT, i, 0, MPI_COMM_WORLD, &reqA);
-            MPI_Isend(A, size, MPI_INT, i, 0, MPI_COMM_WORLD, &reqB);
+            MPI_Isend(&(B[tmpS*size]), (tmpE-tmpS)*size, MPI_INT, i, 0, myComm, &reqA);
+            MPI_Isend(A, size, MPI_INT, i, 0, myComm, &reqB);
         }
     }
     else if (rank < comm_sz)
     {
-        MPI_Recv(B, (end-start)*size, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Recv(A, size, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(B, (end-start)*size, MPI_INT, 0, 0, myComm, MPI_STATUS_IGNORE);
+        MPI_Recv(A, size, MPI_INT, 0, 0, myComm, MPI_STATUS_IGNORE);
     }
-
-    //MPI_Bcast(A, size, MPI_INT, 0, MPI_COMM_WORLD);
 
     //Calculate results
     if (start < size && rank < comm_sz)
@@ -133,7 +133,6 @@ double run(int size, int comm_sz, int rank)
                 C[j] += A[i]*B[(i-start)*(size)+j];
 
     //join up data
-    int* res = malloc(sizeof(int)*size);
     if (rank < comm_sz)
         MPI_Reduce(C, res, size, MPI_INT, MPI_SUM, 0, myComm);
 
@@ -156,15 +155,14 @@ double run(int size, int comm_sz, int rank)
     free(C);
     free(res);
 
-    
-
     if (rank == 0)
         return elapsed;
+    return 0;
 }
 
 int main(int argc, char *argv[])
 {
-    int comm_sz, rank, size, i, j, g = 0; 
+    int comm_sz, rank, size = 1000, i, j, g = 0; 
     /* Start up MPI */
     MPI_Init(NULL, NULL);
     /* Get the number of processes */
@@ -174,18 +172,17 @@ int main(int argc, char *argv[])
 
     if (argc < 3)
     {
-        if (argc > 1 && strcmp(argv[1], "-g") == 0)
-            g = 1;
-        else if (rank == 0)
+        if (rank == 0)
             error("Not enough args");
         else
             exitMPI();
     }
-    if (argc > 3)
-        if (strcmp(argv[3], "-g")==0)
-            g = 1;
-
-    size = strtol(argv[2], NULL, 10); 
+    if (strcmp(argv[2], "-g")==0)
+        g = 1;
+    else if (argc > 3 && strcmp(argv[3], "-g")==0)
+        g = 1;
+    else
+        size = strtol(argv[2], NULL, 10); 
 
     if (g)
     {
@@ -207,7 +204,7 @@ int main(int argc, char *argv[])
                 MPI_Barrier(MPI_COMM_WORLD);
                 double time = run(sizes[i], j, rank);
                 if (rank == 0)
-                    printf("%lf\t", time);
+                    printf("%.3lfms   \t", time);
             }
             if (rank == 0)
                 printf("\n");
@@ -215,9 +212,11 @@ int main(int argc, char *argv[])
     }
     else
     {
+        if (size < comm_sz)
+            comm_sz = size;
         double time =  run(size, comm_sz, rank);
         if (rank == 0)
-            printf("time taken: %lf\n", time);
+            printf("time taken: %.3lfms\n", time);
     }
     
 
