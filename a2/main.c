@@ -134,10 +134,9 @@ double run(int size, int comm_sz, int rank)
 
     //join up data
     int* res = malloc(sizeof(int)*size);
-    //Gotta figure uot fastest way to reduce
-    //if (rank < comm_sz)
-        //MPI_Reduce(C, res, size, MPI_INT, MPI_SUM, 0, myComm);
-    if (rank == 0)
+    if (rank < comm_sz)
+        MPI_Reduce(C, res, size, MPI_INT, MPI_SUM, 0, myComm);
+    /*if (rank == 0)
     {
         for (i = 1; i < comm_sz; i++)
         {
@@ -148,7 +147,7 @@ double run(int size, int comm_sz, int rank)
     {
         MPI_Request req;
         MPI_Isend(C, size, MPI_INT, 0, 0, MPI_COMM_WORLD, &req);
-    }
+    }*/
 
     //Finish timing
     clock_gettime(CLOCK_MONOTONIC, &finishTime);
