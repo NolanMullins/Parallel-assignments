@@ -136,18 +136,6 @@ double run(int size, int comm_sz, int rank)
     int* res = malloc(sizeof(int)*size);
     if (rank < comm_sz)
         MPI_Reduce(C, res, size, MPI_INT, MPI_SUM, 0, myComm);
-    /*if (rank == 0)
-    {
-        for (i = 1; i < comm_sz; i++)
-        {
-            MPI_Recv(res, size, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        }
-    }
-    else if (rank < comm_sz)
-    {
-        MPI_Request req;
-        MPI_Isend(C, size, MPI_INT, 0, 0, MPI_COMM_WORLD, &req);
-    }*/
 
     //Finish timing
     clock_gettime(CLOCK_MONOTONIC, &finishTime);
@@ -185,10 +173,14 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     if (argc < 3)
-        if (rank == 0)
+    {
+        if (argc > 1 && strcmp(argv[1], "-g") == 0)
+            g = 1;
+        else if (rank == 0)
             error("Not enough args");
         else
             exitMPI();
+    }
     if (argc > 3)
         if (strcmp(argv[3], "-g")==0)
             g = 1;
