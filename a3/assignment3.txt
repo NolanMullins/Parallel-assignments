@@ -1,0 +1,74 @@
+> Assignment 3 - OpenMP Boids
+> ----------------------------
+> Due Friday, November 9, 2018
+> 
+> Complete the sample code provided and implement the three rules for a Boids system.
+> Once the program is working in serial, add the OpenMP directives to allow it to
+> run in parallel. 
+> 
+> Sample code is available on Courselink which contains boids.c and a makefile which will compile
+> the graphical version of the program (boids) and the non-graphical version (boidsomp). 
+> The sample code will compile and run but it is not complete.  Add the code and
+> the OpenMP directives to in the locations that are commented in the boids.c file. Also add code
+> to time the execution of the parallel code in the main routine. 
+> 
+> There are instructions in the boids.c file on how to develop the assignment. Follow these
+> instructions. In particular, there are restrictions on which data structures to use and
+> how to organize the code which you must follow when writing your code.
+> 
+> A tutorial describing the three rules for Boids is available at:
+> 	http://www.kfish.org/boids/pseudocode.html
+> Implement the three main rules described on this page. Most of the suggested parameters
+> for the algorithm described on this page are reasonable. The world size is 100x100. 
+> It is possible for the boids to temporarily move outside this space. They will not be
+> drawn but this wont create any problems.  A reasonable distance between boids for rule 2 is 5.0
+> but other small values will work. 
+> 
+> A fourth rule is implemented in the sample code. Leave this code in the program. This is called
+> the "Tendency towards a particular place" on the boids tutorial web page. It causes the
+> flock to move between two points on the screen. It is also an example for how the other rules
+> can be implemented. 
+> 
+> Test the boidsomp program with different numbers of iterations. Determine if there
+> is a point when the parallel version is faster than the serial version.
+> 
+> You can see samples of how a completed boids system works on youtube.
+> 
+> 
+> Documentation
+> -------------
+> Include a readme.txt contains your name and student number. Record the timing information
+> for the parallel version of boidsomp in the readme.txt.
+> 
+> 
+> 
+> Coding Practices
+> ----------------
+> Write the code using standard stylistic practices. Use functions, reasonable variable names,
+> and consistent indentation.  If the code is difficult for the TA to understand then you
+> will lose marks.
+> 
+> As usual, keep backups of your work using source control software.
+> 
+> 
+> Submitting the Assignment
+> -------------------------
+> Submit the assignment using Courselink. Submit only the source code
+> and the makefile. Bundle the files in a tar file.
+> 
+> The assignments will be marked on the linux.socs.uoguelph.ca server.
+> If you develop your code on a different platform then it is a good
+> idea to put the include files in an #ifdef for that system
+> so they will still compile on the server. Test your program on the
+> server before you submit it. 
+> 
+> The TA will unpack your code and type "make". They will then try to
+> run executables named boids and boidsomp.  If the makefile is missing, the make
+> command does not work, or the program does not execute then you will lose
+> a substantial number of marks.
+> 
+> It is always a good idea to unpack and test the file you are submitting
+> to be sure that what you submit actually compiles. 
+     
+     
+     
