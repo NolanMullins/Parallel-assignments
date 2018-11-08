@@ -207,15 +207,12 @@ void moveBoids()
 	/*** do not replace the data structures defined in this program ***/
 	/*** omp code should be used here ***/
 	/*** you can call other functions from this location ***/
-	#pragma omp parallel for
 	for (i=0; i<POPSIZE; i++)
 		rule1(i);
 
-	#pragma omp parallel for 
 	for (i = 0; i < POPSIZE; i++)
 		rule2(i);
 
-	#pragma omp parallel for
 	for (i=0; i<POPSIZE; i++)
 		rule3(i);
 
