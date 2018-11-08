@@ -1,8 +1,10 @@
+/***********************/
+ * cis3090 A3          *
+ * Name: Nolan Mullins *
+ * Student #: 0939720  *
+/***********************/
 
--starting code for assignment 3
--you need to add the code to implment the three rules for Boids
--the program will not operate correctly until you implement the three Boids rules
--then add the omp code to make the program run in parallel
+
 -the makefile will compile two executables:
 	boids -the graphical version of boids which uses ncurses
 	boidsomp -the parallel version which you can use for timing tests
@@ -16,3 +18,21 @@ usage: boidsomp <number>
   -run the parallel version of the boids program
   -<number> is the number of iterations it will perform before exiting, the default is 1000
 
+-----------------------------------
+Hardware used
+-----------------------------------
+    CPU: i7 4790k @ 4.30 GHz 4 cores 8 Threads
+    RAM: 16GB ddr3 in duel channel
+-----------------------------------
+
+-----------------------------------
+Results
+-----------------------------------
+
+Iterations      Serial (s)      OMP (s)
+5 000           0.363      
+10 000          0.718
+50 000          3.592
+100 000         7.206
+500 000         36.201
+1 000 000       72.062

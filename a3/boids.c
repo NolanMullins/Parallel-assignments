@@ -6,14 +6,15 @@
 	-Boids algorithms from "Boids Pseudocode:
 	 http://www.kfish.org/boids/pseudocode.html
 */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <sys/time.h>
 #ifndef NOGRAPHICS
 #include <unistd.h>
 #include <ncurses.h>
-#include <time.h>
 #endif
 
 #define DELAY 50000
@@ -274,10 +275,10 @@ int main(int argc, char *argv[])
 
 	/*** Start timing here ***/
 	/*** omp code can be used here ***/
-    struct timespec startTime, finishTime;
+    struct timeval  start, finish;
     double elapsed;
 
-    clock_gettime(CLOCK_MONOTONIC, &startTime);
+    gettimeofday(&start, NULL);
 
 	for (i = 0; i < count; i++)
 	{
@@ -285,13 +286,13 @@ int main(int argc, char *argv[])
 	}
 	/*** End timing here ***/
 	/*** print timing results ***/
-    clock_gettime(CLOCK_MONOTONIC, &finishTime);
+    gettimeofday(&finish, NULL);
 
-    elapsed = (finishTime.tv_sec - startTime.tv_sec);
-    elapsed += (finishTime.tv_nsec - startTime.tv_nsec) / 1000000000.0;
-    elapsed *= 1000;
+    elapsed = (double) (finish.tv_sec - start.tv_sec);
+    elapsed += (double) (finish.tv_usec - start.tv_usec) / 1000000.0 ;
+    //elapsed *= 1000;
 
-    printf("time taken: %.3lfms\n", elapsed);
+    printf("time taken: %.3lfs\n", elapsed);
 
 #endif
 
