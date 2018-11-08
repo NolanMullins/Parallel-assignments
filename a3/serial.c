@@ -193,6 +193,8 @@ void rule3(int boid)
 		boidUpdate[boid][i] += v[i];
 }
 
+void (*rules[3])(int boid) = {rule1, rule2, rule3};
+
 void moveBoids()
 {
 	int i, j;
@@ -207,14 +209,10 @@ void moveBoids()
 	/*** do not replace the data structures defined in this program ***/
 	/*** omp code should be used here ***/
 	/*** you can call other functions from this location ***/
-	for (i=0; i<POPSIZE; i++)
-		rule1(i);
 
-	for (i = 0; i < POPSIZE; i++)
-		rule2(i);
-
-	for (i=0; i<POPSIZE; i++)
-		rule3(i);
+	for (i = 0; i < 3; i++)
+		for (j = 0; j < POPSIZE; j++)
+			rules[i](j);
 
 	moveFlock();
 	

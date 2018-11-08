@@ -43,6 +43,7 @@ float boidArray[POPSIZE][6];
 // change in velocity is stored for each boid (x,y,z)
 // this is applied after all changes are calculated for each boid
 float boidUpdate[POPSIZE][3];
+float boidRules[3][POPSIZE][3];
 
 #define DEBUG_LOG 0
 char debug[128];
@@ -133,9 +134,9 @@ void moveFlock()
 	// towards the current target point
 	for (i = 0; i < POPSIZE; i++)
 	{
-		boidUpdate[i][BX] += (px - boidArray[i][BX]) / 200.0;
-		boidUpdate[i][BY] += (py - boidArray[i][BY]) / 200.0;
-		boidUpdate[i][BZ] += (pz - boidArray[i][BZ]) / 200.0;
+		boidUpdate[i][BX] = (px - boidArray[i][BX]) / 200.0;
+		boidUpdate[i][BY] = (py - boidArray[i][BY]) / 200.0;
+		boidUpdate[i][BZ] = (pz - boidArray[i][BZ]) / 200.0;
 	}
 	count++;
 }
@@ -151,7 +152,7 @@ void rule1(int boid)
 				cen[j] += boidArray[i][j];
 
 	for (i = 0; i < 3; i++)
-		boidUpdate[boid][i] += ((cen[i] / (POPSIZE-1)) - boidArray[boid][i]) / 150.0 ;
+		boidRules[0][boid][i] = ((cen[i] / (POPSIZE-1)) - boidArray[boid][i]) / 150.0 ;
 }
 
 float dist(float *p1, float *p2)
@@ -176,7 +177,7 @@ void rule2(int boid)
 			for (j = 0; j < 3; j++)
 				c[j] -= (boidArray[i][j] - boidArray[boid][j])/5.0;
 	for (i=0; i<3; i++)
-		boidUpdate[boid][i] += c[i];
+		boidRules[1][boid][i] = c[i];
 }
 
 void rule3(int boid)
@@ -190,16 +191,14 @@ void rule3(int boid)
 	for (i=0; i<3; i++)
 		v[i] = ((v[i]/(POPSIZE-1))-boidArray[boid][i+3])/4.0;
 	for (i=0; i<3; i++)
-		boidUpdate[boid][i] += v[i];
+		boidRules[2][boid][i] = v[i];
 }
+
+void (*rules[3])(int boid) = {rule1, rule2, rule3};
 
 void moveBoids()
 {
-	int i, j;
-
-	for (i = 0; i < POPSIZE; i++)
-		for (j = 0; j < 3; j++)
-			boidUpdate[i][j] = 0;
+	int i, j, k;
 
 	/*** Your code goes here ***/
 	/*** add the code to implement the three boids rules ***/
@@ -207,17 +206,11 @@ void moveBoids()
 	/*** do not replace the data structures defined in this program ***/
 	/*** omp code should be used here ***/
 	/*** you can call other functions from this location ***/
-	#pragma omp parallel for
-	for (i=0; i<POPSIZE; i++)
-		rule1(i);
 
-	#pragma omp parallel for 
-	for (i = 0; i < POPSIZE; i++)
-		rule2(i);
-
-	#pragma omp parallel for
-	for (i=0; i<POPSIZE; i++)
-		rule3(i);
+	#pragma omp parallel for num_threads(3)
+	for (i = 0; i < 3; i++)
+		for (j = 0; j < POPSIZE; j++)
+			rules[i](j);
 
 	moveFlock();
 	
@@ -225,12 +218,17 @@ void moveBoids()
 
 	// move boids by calculating updated velocity and new position
 	// you can optimize this code if you wish and you can add omp directives here
+	//#pragma omp parallel for num_threads(4)
 	for (i = 0; i < POPSIZE; i++)
 	{
 		// update velocity for each boid using value stored in boidUpdate[][]
 		boidArray[i][VX] += boidUpdate[i][BX];
 		boidArray[i][VY] += boidUpdate[i][BY];
 		boidArray[i][VZ] += boidUpdate[i][BZ];
+		int j,k;
+		for (j = 0; j < 3; j++)
+			for (k = 0; k < 3; k++)
+				boidArray[i][3+k] += boidRules[j][i][k];
 		// update position for each boid using newly updated velocity
 		boidArray[i][BX] += boidArray[i][VX];
 		boidArray[i][BY] += boidArray[i][VY];
