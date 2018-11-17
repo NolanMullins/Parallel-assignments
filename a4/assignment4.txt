@@ -1,0 +1,83 @@
+> Assignment 4 - OpenCL and 2D Physics Simulation
+> 
+> Due Friday, November 23, 2018
+> 
+> Port a serial C program which simulates the collision detection and
+> response of a 2D collection of balls to run using OpenCL.
+> This will require a major reorganization of the C code. You will
+> need to rewrite much of the code to run using OpenCL. 
+> 
+> Write the OpenCl code to perform collision operations on the objects
+> in the sample code. The function moveBalls() and the other functions it
+> calls will need to be rewritten. As a rule of thumb, all references to
+> to the ballArray[][] and ballUpdate[][] arrays, and the collision calculations
+> should be performed in a kernel.  You can rewrite the initBalls() function if
+> you wish. You can add or remove functions as needed.
+> 
+> Your program should run a reasonable number of kernels. One for each
+> element in ballArray[][] would be reasonable. You can run multiple kernels
+> for different operations if you wish.
+> 
+> Do not perform all calculations in global memory. Use local memory
+> for temporary calculations. Don't needlessly pass information between
+> the kernel and the application. 
+> 
+> You do not need to run any timing tests for this assignment.
+> There will not likely be a noticeable performance increase 
+> due to slowness of the ncurses interface.
+> 
+> Starting Code
+> -------------
+> The code to build the assignment upon is on the Courselink site.
+> It compiles and runs with a ncurses interface. It is easier to see the
+> collisions between the balls if you enlarge the text window and run
+> the program with a smaller number of objects (around 20).
+> 
+> Program Objectives 
+> ------------------
+> The default parameters for the simulation are defined using macros
+> at the start of the program.  The program should run without any command
+> line arguments using the default parameters. You can add command line
+> arguments to the program but the program should still run using the
+> default parameters when executed with no command line arguments.
+> 
+> 
+> OpenCL
+> ------
+> The program must run on the Mac machines running OSX in Thornborough 2420.
+> 
+> 
+> Documentation
+> -------------
+> Include a readme.txt contains your name and student number.
+> 
+> 
+> Coding Practices
+> ----------------
+> Write the code using standard stylistic practices. Use functions, 
+> reasonable variable names, and consistent indentation.
+> If the code is difficult for the TA to understand then you
+> will lose marks.
+> 
+> As usual, keep backups of your work using source control software.
+> 
+> 
+> Submitting the Assignment
+> -------------------------
+> Submit the assignment using Courselink. Submit only the source code
+> and the makefile. Bundle the code in a tar file.
+> 
+> The assignments will be marked on OSX machines in Thornborough 2420.
+> If you develop your code on a different platform then it is a good
+> idea to put the include files in an #ifdef for that system
+> so they will still compile on the server. Test your program on the
+> machines in THRN 2420 before you submit it. 
+> 
+> The TA will unpack your code and type "make". They will then try to
+> run executables named a4.  If the makefile is missing, the make command
+> does not work, or the program does not execute then you will lose
+> a substantial number of marks.
+> 
+> It is always a good idea to unpack and test the file you are submitting
+> to be sure that what you submit actually compiles. 
+ 
