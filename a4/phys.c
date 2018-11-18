@@ -17,6 +17,7 @@
 #ifdef MAC
 #include <OpenCL/cl.h>
 #else
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #include <CL/cl.h>
 #endif
 
@@ -56,7 +57,7 @@ float ballArray[POPSIZE][4];
 float ballUpdate[POPSIZE][2];
 
 //used to output info to the screen
-#define DEBUG_LOG 1 
+#define DEBUG_LOG 1
 char debug[256];
 
 void initBalls()
@@ -95,7 +96,7 @@ int drawBalls()
 	}
 
 	if (DEBUG_LOG)
-		mvprintw(0,0,debug);
+		mvprintw(0, 0, debug);
 
 	refresh();
 
@@ -253,7 +254,7 @@ void moveBalls()
 
 int main(int argc, char *argv[])
 {
-	int i, count;
+	int i, j, count;
 
 	/* OpenCL structures */
 	cl_device_id device;
@@ -263,6 +264,16 @@ int main(int argc, char *argv[])
 	cl_command_queue queue;
 	cl_int a, b, err;
 	size_t local_size, global_size;
+
+	/* Data and buffers */
+	int arrSize = 32;
+	float data[arrSize];
+	float sum[32], total;
+	cl_mem input_buffer, out_buffer;
+	cl_int num_groups;
+
+	for (i = 0; i < arrSize; i++)
+		data[i] = 1;
 
 	/* Create device and context */
 	device = create_device();
@@ -279,12 +290,78 @@ int main(int argc, char *argv[])
 	clGetDeviceInfo(device, CL_DEVICE_MAX_CLOCK_FREQUENCY, sizeof(clock_frequency), &clock_frequency, NULL);
 	cl_ulong mem;
 	clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(mem), &mem, NULL);
-	
+
 	sprintf(debug, "%s (%u Mhz) (%u MB)", name, clock_frequency, (unsigned int)(mem / (1024 * 1024)));
 
+	/* Build program */
+	program = build_program(context, device, "phys.cl");
+
+	/* Create data buffer */
+	global_size = 32;
+	local_size = 1;
+	num_groups = global_size / local_size;
+	input_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, arrSize * sizeof(float), data, &err);
+	out_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, num_groups * sizeof(float), sum, &err);
+	if (err < 0)
+	{
+		perror("Couldn't create a buffer");
+		exit(1);
+	};
+
+	/* Create a command queue */
+	queue = clCreateCommandQueue(context, device, 0, &err);
+	if (err < 0)
+	{
+		perror("Couldn't create a command queue");
+		exit(1);
+	};
+
+	/* Create a kernel */
+	kernel = clCreateKernel(program, "phys", &err);
+	if (err < 0)
+	{
+		perror("Couldn't create a kernel");
+		exit(1);
+	};
+
+	/* Create kernel arguments */
+	err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input_buffer);
+	err |= clSetKernelArg(kernel, 1, local_size * sizeof(float), NULL);
+	err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &out_buffer);
+	if (err < 0)
+	{
+		perror("Couldn't create a kernel argument");
+		exit(1);
+	}
+
+	/* Enqueue kernel */
+	err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &global_size, &local_size, 0, NULL, NULL);
+	if (err < 0)
+	{
+		perror("Couldn't enqueue the kernel");
+		exit(1);
+	}
+
+	/* Read the kernel's output */
+	err = clEnqueueReadBuffer(queue, out_buffer, CL_TRUE, 0, sizeof(sum), sum, 0, NULL, NULL);
+	if (err < 0)
+	{
+		perror("Couldn't read the buffer");
+		exit(1);
+	}
+
+	/* Check result */
+	total = 0.0f;
+	for (j = 0; j < num_groups; j++)
+	{
+		printf("sum[%d] = %.1f\n", j, sum[j]);
+		total += sum[j];
+	}
+	printf("Computed sum = %.1f.\n", total);
+	
 
 	// initialize curses
-	initscr();
+	/*initscr();
 	noecho();
 	cbreak();
 	timeout(0);
@@ -304,7 +381,15 @@ int main(int argc, char *argv[])
 	}
 
 	// shut down curses
-	endwin();
+	endwin();*/
+
+	/* Deallocate resources */
+	clReleaseKernel(kernel);
+	clReleaseMemObject(out_buffer);
+	clReleaseMemObject(input_buffer);
+	clReleaseCommandQueue(queue);
+	clReleaseProgram(program);
+	clReleaseContext(context);
 }
 
 /* Find a GPU or CPU associated with the first available platform */
