@@ -58,7 +58,11 @@ float ballUpdate[POPSIZE][2];
 
 //used to output info to the screen
 #define DEBUG_LOG 1
-char debug[256];
+char debug[32][256];
+
+//DELETE ME
+#define arrSize 32
+float data[arrSize];
 
 void initBalls()
 {
@@ -96,7 +100,8 @@ int drawBalls()
 	}
 
 	if (DEBUG_LOG)
-		mvprintw(0, 0, debug);
+		for (i = 0; i < 32; i++)
+			mvprintw(0, i, debug[i]);
 
 	refresh();
 
@@ -184,9 +189,81 @@ void resolveCollision(int i, int j)
 	ballUpdate[j][BY] = ballArray[j][VY] + ((1 / MASS) * impulse);
 }
 
-void moveBalls()
+void moveBalls(cl_device_id device, cl_context* context, cl_program* program)
 {
 	int i, j;
+	cl_int a, b, err;
+
+	cl_kernel kernel;
+	cl_command_queue queue;
+
+	/* Data and buffers */
+	float sum[32], total;
+	cl_mem input_buffer, out_buffer;
+	cl_int num_groups;
+
+	
+
+	/* Create data buffer */
+	size_t local_size = 1, global_size = 32;
+	num_groups = global_size / local_size;
+	input_buffer = clCreateBuffer(*context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, arrSize * sizeof(float), data, &err);
+	out_buffer = clCreateBuffer(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, num_groups * sizeof(float), data, &err);
+	if (err < 0)
+	{
+		perror("Couldn't create a buffer");
+		exit(1);
+	};
+
+	/* Create a command queue */
+	queue = clCreateCommandQueue(*context, device, 0, &err);
+	if (err < 0)
+	{
+		perror("Couldn't create a command queue");
+		exit(1);
+	};
+
+	/* Create a kernel */
+	kernel = clCreateKernel(*program, "phys", &err);
+	if (err < 0)
+	{
+		perror("Couldn't create a kernel");
+		exit(1);
+	};
+
+	/* Create kernel arguments */
+	err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input_buffer);
+	err |= clSetKernelArg(kernel, 1, local_size * sizeof(float), NULL);
+	err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &out_buffer);
+	if (err < 0)
+	{
+		perror("Couldn't create a kernel argument");
+		exit(1);
+	}
+
+	/* Enqueue kernel */
+	err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &global_size, &local_size, 0, NULL, NULL);
+	if (err < 0)
+	{
+		perror("Couldn't enqueue the kernel");
+		exit(1);
+	}
+
+	/* Read the kernel's output */
+	err = clEnqueueReadBuffer(queue, out_buffer, CL_TRUE, 0, sizeof(data), data, 0, NULL, NULL);
+	if (err < 0)
+	{
+		perror("Couldn't read the buffer");
+		exit(1);
+	}
+
+	/* Check result */
+	total = 0.0f;
+	for (j = 0; j < num_groups; j++)
+	{
+		total += data[j];
+	}
+	printf("Computed sum = %.1f.\n", total);
 
 	// update velocity of balls based upon collisions
 	// compare all balls to all other circles using two loops
@@ -250,6 +327,11 @@ void moveBalls()
 			ballArray[i][BY] = 0.5;
 		}
 	}
+
+	clReleaseKernel(kernel);
+	clReleaseMemObject(out_buffer);
+	clReleaseMemObject(input_buffer);
+	clReleaseCommandQueue(queue);
 }
 
 int main(int argc, char *argv[])
@@ -260,20 +342,7 @@ int main(int argc, char *argv[])
 	cl_device_id device;
 	cl_context context;
 	cl_program program;
-	cl_kernel kernel;
-	cl_command_queue queue;
-	cl_int a, b, err;
-	size_t local_size, global_size;
-
-	/* Data and buffers */
-	int arrSize = 32;
-	float data[arrSize];
-	float sum[32], total;
-	cl_mem input_buffer, out_buffer;
-	cl_int num_groups;
-
-	for (i = 0; i < arrSize; i++)
-		data[i] = 1;
+	cl_int err;
 
 	/* Create device and context */
 	device = create_device();
@@ -291,74 +360,10 @@ int main(int argc, char *argv[])
 	cl_ulong mem;
 	clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(mem), &mem, NULL);
 
-	sprintf(debug, "%s (%u Mhz) (%u MB)", name, clock_frequency, (unsigned int)(mem / (1024 * 1024)));
+	sprintf(debug[0], "%s (%u Mhz) (%u MB)", name, clock_frequency, (unsigned int)(mem / (1024 * 1024)));
 
 	/* Build program */
 	program = build_program(context, device, "phys.cl");
-
-	/* Create data buffer */
-	global_size = 32;
-	local_size = 1;
-	num_groups = global_size / local_size;
-	input_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, arrSize * sizeof(float), data, &err);
-	out_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, num_groups * sizeof(float), sum, &err);
-	if (err < 0)
-	{
-		perror("Couldn't create a buffer");
-		exit(1);
-	};
-
-	/* Create a command queue */
-	queue = clCreateCommandQueue(context, device, 0, &err);
-	if (err < 0)
-	{
-		perror("Couldn't create a command queue");
-		exit(1);
-	};
-
-	/* Create a kernel */
-	kernel = clCreateKernel(program, "phys", &err);
-	if (err < 0)
-	{
-		perror("Couldn't create a kernel");
-		exit(1);
-	};
-
-	/* Create kernel arguments */
-	err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input_buffer);
-	err |= clSetKernelArg(kernel, 1, local_size * sizeof(float), NULL);
-	err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &out_buffer);
-	if (err < 0)
-	{
-		perror("Couldn't create a kernel argument");
-		exit(1);
-	}
-
-	/* Enqueue kernel */
-	err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &global_size, &local_size, 0, NULL, NULL);
-	if (err < 0)
-	{
-		perror("Couldn't enqueue the kernel");
-		exit(1);
-	}
-
-	/* Read the kernel's output */
-	err = clEnqueueReadBuffer(queue, out_buffer, CL_TRUE, 0, sizeof(sum), sum, 0, NULL, NULL);
-	if (err < 0)
-	{
-		perror("Couldn't read the buffer");
-		exit(1);
-	}
-
-	/* Check result */
-	total = 0.0f;
-	for (j = 0; j < num_groups; j++)
-	{
-		printf("sum[%d] = %.1f\n", j, sum[j]);
-		total += sum[j];
-	}
-	printf("Computed sum = %.1f.\n", total);
-	
 
 	// initialize curses
 	/*initscr();
@@ -367,27 +372,27 @@ int main(int argc, char *argv[])
 	timeout(0);
 	curs_set(FALSE);
 	// Global var `stdscr` is created by the call to `initscr()`
-	getmaxyx(stdscr, max_y, max_x);
+	getmaxyx(stdscr, max_y, max_x);*/
+	max_y = 50;
+	max_y = 50;
 
 	// place balls in initial position
 	initBalls();
+	for (i = 0; i < arrSize; i++)
+		data[i] = 1;
 
 	// draw and move balls using ncurses
 	while (1)
 	{
-		if (drawBalls() == 1)
-			break;
-		moveBalls();
+		//if (drawBalls() == 1)
+		//	break;
+		moveBalls(device, &context, &program);
 	}
 
 	// shut down curses
-	endwin();*/
+	//endwin();
 
 	/* Deallocate resources */
-	clReleaseKernel(kernel);
-	clReleaseMemObject(out_buffer);
-	clReleaseMemObject(input_buffer);
-	clReleaseCommandQueue(queue);
 	clReleaseProgram(program);
 	clReleaseContext(context);
 }

@@ -12,7 +12,7 @@ __kernel void phys(__global float *data,
 	//local_addr = get_local_id(0);
 	//local_result[local_addr] = input + 1;
 
-	printf("ID: %d | input: %.1f\n",get_group_id(0), input);
+	//printf("ID: %d | input: %.1f\n",get_group_id(0), input);
 
 	group_result[get_group_id(0)] = input+1;
 
