@@ -25,7 +25,7 @@
 #include "data.h"
 
 // used to slow curses animation
-#define DELAY 550000
+#define DELAY 50000
 
 // ball location (x,y,z) and velocity (vx,vy,vz) in ballArray[][]
 #define BX 0
@@ -46,7 +46,7 @@ float ballUpdate[POPSIZE][2];
 
 //used to output info to the screen
 #define DEBUG_LOG 1
-#define DISPLAY 0 
+#define DISPLAY 1 
 char debug[32][256];
 
 void initBalls()
@@ -57,7 +57,7 @@ void initBalls()
 	// calculate initial random locations for each ball, scaled based on the screen size
 	for (i = 0; i < POPSIZE; i++)
 	{
-		ballArray[i][BX] = (float)(random() % SCREENSIZE);
+		ballArray[i][BX] =  (float)(random() % SCREENSIZE);
 		ballArray[i][BY] = (float)(random() % SCREENSIZE);
 		ballArray[i][VX] = (float)((random() % 5) - 2);
 		ballArray[i][VY] = (float)((random() % 5) - 2);
@@ -168,34 +168,26 @@ void moveBalls(cl_device_id device, cl_context* context, cl_program* program)
 		exit(1);
 	}
 
-	// update velocity of balls based upon collisions
-	// compare all balls to all other circles using two loops
-	/*for (i = 0; i < POPSIZE; i++)
-	{
-		for (j = i + 1; j < POPSIZE; j++)
-		{
-			if (ballCollision(i, j) == COLLIDE)
-			{
-				resolveCollision(i, j);
-			}
-		}
-	} */
+	/*if (!DISPLAY)
+		for (i = 0; i < POPSIZE; i++)
+			printf("X: %.1f, Y: %.1f\n", ballUpdate[i][BX], ballUpdate[i][BY]);
 
-	//if (DEBUG_LOG && 0)
-		//for (i = 0; i < POPSIZE; i++)
-			//sprintf(debug[i+1], "POSX: %.1f, POSY: %.1f, VX: %.1f, VY: %.1f | UX: %.10f, UY: %.10f", ballArray[i][0], ballArray[i][1], ballArray[i][2], ballArray[i][3], ballUpdate[i][0], ballUpdate[i][1]);
+	if (DEBUG_LOG)
+		for (i = 0; i < POPSIZE; i++)
+			sprintf(debug[i+1], "POSX: %.1f, POSY: %.1f, VX: %.1f, VY: %.1f | UX: %.10f, UY: %.10f", ballArray[i][0], ballArray[i][1], ballArray[i][2], ballArray[i][3], ballUpdate[i][0], ballUpdate[i][1]);
+	*/
 
 	// move balls by calculating updating velocity and position
 	for (i = 0; i < POPSIZE; i++)
 	{
 		// update velocity for each ball
-		if (abs(ballUpdate[i][BX]) >= 0.1)
+		if (fabs(ballUpdate[i][BX]) >= 0.01)
 		{
 			printf ("ballUpdate: %.1f,%.1f\n", ballUpdate[i][0], ballUpdate[i][1]);
 			ballArray[i][VX] = ballUpdate[i][BX];
 			ballUpdate[i][BX] = 0.0;
 		}
-		if (abs(ballUpdate[i][BY]) >= 0.1)
+		if (fabs(ballUpdate[i][BY]) >= 0.01)
 		{
 			ballArray[i][VY] = ballUpdate[i][BY];
 			ballUpdate[i][BY] = 0.0;
@@ -236,17 +228,13 @@ void moveBalls(cl_device_id device, cl_context* context, cl_program* program)
 		}
 	}
 
-	//if (DEBUG_LOG)
-	//	for (i = 0; i < POPSIZE; i++)
-	//		sprintf(debug[i+1], "POSX: %.1f, POSY: %.1f, VX: %.1f, VY: %.1f | UX: %.1f, UY: %.1f", ballArray[i][0], ballArray[i][1], ballArray[i][2], ballArray[i][3], ballUpdate[i][0], ballUpdate[i][1]);
-
 	clReleaseKernel(kernel);
 	clReleaseMemObject(out_buffer);
 	clReleaseMemObject(input_buffer);
 	clReleaseCommandQueue(queue);
 
-	if (!DISPLAY)
-		usleep(100);
+	//if (!DISPLAY)
+		//usleep(DELAY);
 }
 
 int main(int argc, char *argv[])

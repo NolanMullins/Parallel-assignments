@@ -14,6 +14,7 @@ int ballCollision(float4 balli, float4 ballj)
 	// Pythagorean distance
 	distance = sqrt(pow((balli.s0 - ballj.s0), 2) + pow((balli.s1 - ballj.s1), 2));
 	radiiSum = RADIUS + RADIUS;
+
 	// if the sum of the two radii is less than the distance
 	// between the balls then they collide, otherwise they
 	// do not collide
@@ -72,13 +73,6 @@ float2 resolveCollision(float i, float4 balli, float j, float4 ballj)
 	vel.s1 = balli.s3 + dir * ((1 / MASS) * impulse);
 
 	return vel;
-
-	/*ix = impulse * nx;
-	iy = impulse * ny;
-	ballUpdate[i][BX] = ballArray[i][VX] - ((1 / MASS) * impulse);
-	ballUpdate[i][BY] = ballArray[i][VY] - ((1 / MASS) * impulse);
-	ballUpdate[j][BX] = ballArray[j][VX] + ((1 / MASS) * impulse);
-	ballUpdate[j][BY] = ballArray[j][VY] + ((1 / MASS) * impulse);*/
 }
 
 __kernel void phys(__global float4 *data,
@@ -98,10 +92,11 @@ __kernel void phys(__global float4 *data,
 
 	/*local_addr = get_local_id(0);
 	local_result[local_addr] = local_vel;*/
+	
 
 	for (a = 0; a < POPSIZE; a++)
 		if (a != group_id)
-			if (ballCollision(ball, a) == COLLIDE)
+			if (ballCollision(ball, data[a]) == COLLIDE)
 				vel = resolveCollision(group_id, ball, a, data[a]);
 
 	group_result[get_group_id(0)] = vel;

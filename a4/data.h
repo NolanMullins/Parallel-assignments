@@ -1,5 +1,5 @@
 // number of balls
-#define POPSIZE 2 
+#define POPSIZE 50 
 // ball radius, all circles have the same radius
 #define RADIUS 1.0
 // indicate if balls collide or not
