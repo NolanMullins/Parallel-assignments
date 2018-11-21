@@ -81,7 +81,7 @@ float2 resolveCollision(float i, float4 balli, float j, float4 ballj)
 __kernel void phys(__global float4 *data,
 				   __local float2 *local_result, __global float4 *group_result)
 {
-	__local float4 ball;
+	float4 ball;
 	float2 local_vel;
 	float2 vel;
 	uint global_addr, local_id;
@@ -91,7 +91,7 @@ __kernel void phys(__global float4 *data,
 	group_id = get_group_id(0);
 	local_id = get_local_id(0);
 	ball = data[group_id];
-
+    
 	vel.s0 = 0;
 	vel.s1 = 0;
 
@@ -119,15 +119,9 @@ __kernel void phys(__global float4 *data,
 
 	// update velocity for each ball
 	if (fabs(vel.s0) >= 0.01)
-	{
 		ball.s2 = vel.s0;
-		//ballUpdate[i][BX] = 0.0;
-	}
 	if (fabs(vel.s1) >= 0.01)
-	{
 		ball.s3 = vel.s1;
-		//ballUpdate[i][BY] = 0.0;
-	}
 
 	// enforce maximum velocity of 2.0 in each axis
 	// done to make it easier to see collisions
@@ -135,11 +129,11 @@ __kernel void phys(__global float4 *data,
 		ball.s2 = 2.0;
 	if (ball.s3 > 2.0)
 		ball.s3 = 2.0;
-
+    
 	// update position for each ball
 	ball.s0 += ball.s2;
 	ball.s1 += ball.s3;
-
+    
 	// if ball moves off the screen then reverse velocity so it bounces
 	// back onto the screen, and move it onto the screen
 	if (ball.s0 > (SCREENSIZE - 1))

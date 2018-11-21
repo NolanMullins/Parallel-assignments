@@ -47,7 +47,7 @@ float ballArray[POPSIZE][4];
 
 //used to output info to the screen
 #define DEBUG_LOG 1
-#define DISPLAY 1 
+#define DISPLAY 1
 char debug[32][256];
 
 void initBalls()

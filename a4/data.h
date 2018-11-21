@@ -1,5 +1,5 @@
 // number of balls
-#define POPSIZE 500 
+#define POPSIZE 100
 // ball radius, all circles have the same radius
 #define RADIUS 1.0
 // indicate if balls collide or not
@@ -11,6 +11,6 @@
 #define MASS 1.0
 
 // maximum screen size, both height and width
-#define SCREENSIZE 200
+#define SCREENSIZE 100
 
 #define maxTimingHist 50
