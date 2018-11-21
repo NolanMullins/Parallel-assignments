@@ -14,6 +14,9 @@
 #include <unistd.h>
 #include <ncurses.h>
 #include <time.h>
+#include <sys/time.h>
+#include <ctype.h>
+#include <string.h>
 
 #ifdef MAC
 #include <OpenCL/cl.h>
@@ -41,8 +44,6 @@ int max_y = 0, max_x = 0;
 
 // location and velocity of ball
 float ballArray[POPSIZE][4];
-// change in velocity is stored for each ball (x,y,z)
-float ballUpdate[POPSIZE][2];
 
 //used to output info to the screen
 #define DEBUG_LOG 1
@@ -61,8 +62,6 @@ void initBalls()
 		ballArray[i][BY] = (float)(random() % SCREENSIZE);
 		ballArray[i][VX] = (float)((random() % 5) - 2);
 		ballArray[i][VY] = (float)((random() % 5) - 2);
-		ballUpdate[i][BX] = 0.0;
-		ballUpdate[i][BY] = 0.0;
 	}
 }
 
@@ -83,7 +82,7 @@ int drawBalls()
 	// display balls
 	for (i = 0; i < POPSIZE; i++)
 	{
-		mvprintw((int)(ballArray[i][BX] * multy), (int)(ballArray[i][BY] * multx), "o");
+		mvprintw((int)(ballArray[i][BY] * multy), (int)(ballArray[i][BX] * multx), "o");
 	}
 
 	if (DEBUG_LOG)
@@ -119,7 +118,7 @@ void moveBalls(cl_device_id device, cl_context* context, cl_program* program)
 	size_t local_size = 1, global_size = POPSIZE;
 	num_groups = global_size / local_size;
 	input_buffer = clCreateBuffer(*context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, POPSIZE * 4 * sizeof(float), ballArray, &err);
-	out_buffer = clCreateBuffer(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, POPSIZE * 2 * sizeof(float), ballUpdate, &err);
+	out_buffer = clCreateBuffer(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, POPSIZE * 4 * sizeof(float), ballArray, &err);
 	if (err < 0)
 	{
 		perror("Couldn't create a buffer");
@@ -161,71 +160,11 @@ void moveBalls(cl_device_id device, cl_context* context, cl_program* program)
 	}
 
 	/* Read the kernel's output */
-	err = clEnqueueReadBuffer(queue, out_buffer, CL_TRUE, 0, POPSIZE * 2 * sizeof(float), ballUpdate, 0, NULL, NULL);
+	err = clEnqueueReadBuffer(queue, out_buffer, CL_TRUE, 0, POPSIZE * 4 * sizeof(float), ballArray, 0, NULL, NULL);
 	if (err < 0)
 	{
 		perror("Couldn't read the buffer");
 		exit(1);
-	}
-
-	/*if (!DISPLAY)
-		for (i = 0; i < POPSIZE; i++)
-			printf("X: %.1f, Y: %.1f\n", ballUpdate[i][BX], ballUpdate[i][BY]);
-
-	if (DEBUG_LOG)
-		for (i = 0; i < POPSIZE; i++)
-			sprintf(debug[i+1], "POSX: %.1f, POSY: %.1f, VX: %.1f, VY: %.1f | UX: %.10f, UY: %.10f", ballArray[i][0], ballArray[i][1], ballArray[i][2], ballArray[i][3], ballUpdate[i][0], ballUpdate[i][1]);
-	*/
-
-	// move balls by calculating updating velocity and position
-	for (i = 0; i < POPSIZE; i++)
-	{
-		// update velocity for each ball
-		if (fabs(ballUpdate[i][BX]) >= 0.01)
-		{
-			printf ("ballUpdate: %.1f,%.1f\n", ballUpdate[i][0], ballUpdate[i][1]);
-			ballArray[i][VX] = ballUpdate[i][BX];
-			ballUpdate[i][BX] = 0.0;
-		}
-		if (fabs(ballUpdate[i][BY]) >= 0.01)
-		{
-			ballArray[i][VY] = ballUpdate[i][BY];
-			ballUpdate[i][BY] = 0.0;
-		}
-
-		// enforce maximum velocity of 2.0 in each axis
-		// done to make it easier to see collisions
-		if (ballArray[i][VX] > 2.0)
-			ballArray[i][VX] = 2.0;
-		if (ballArray[i][VY] > 2.0)
-			ballArray[i][VY] = 2.0;
-
-		// update position for each ball
-		ballArray[i][BX] += ballArray[i][VX];
-		ballArray[i][BY] += ballArray[i][VY];
-
-		// if ball moves off the screen then reverse velocity so it bounces
-		// back onto the screen, and move it onto the screen
-		if (ballArray[i][BX] > (SCREENSIZE - 1))
-		{
-			ballArray[i][VX] *= -1.0;
-			ballArray[i][BX] = SCREENSIZE - 1.5;
-		}
-		if (ballArray[i][BX] < 0.0)
-		{
-			ballArray[i][VX] *= -1.0;
-			ballArray[i][BX] = 0.5;
-		}
-		if (ballArray[i][BY] > (SCREENSIZE - 1))
-		{
-			ballArray[i][VY] *= -1.0;
-			ballArray[i][BY] = SCREENSIZE - 1.5;
-		}
-		if (ballArray[i][BY] < 0.0)
-		{
-			ballArray[i][VY] *= -1.0;
-			ballArray[i][BY] = 0.5;
-		}
 	}
 
 	clReleaseKernel(kernel);
@@ -234,7 +173,15 @@ void moveBalls(cl_device_id device, cl_context* context, cl_program* program)
 	clReleaseCommandQueue(queue);
 
 	//if (!DISPLAY)
-		//usleep(DELAY);
+	//	usleep(5000000);
+}
+
+void addVal(double* arr, double val, int index)
+{
+    int i;
+    for (i = 0; i < index; i++)
+        arr[i] = arr[i+1];
+    arr[index] = val;
 }
 
 int main(int argc, char *argv[])
@@ -288,13 +235,32 @@ int main(int argc, char *argv[])
 	// place balls in initial position
 	initBalls();
 
+	//timing information
+	struct timeval start, finish;
+    double elapsed;
+    double times[maxTimingHist];
+    int index = 0;
+    memset(&times, 0, sizeof(times));
+
 	// draw and move balls using ncurses
 	while (1)
 	{
 		if (DISPLAY)
 			if (drawBalls() == 1)
 				break;
+        gettimeofday(&start, NULL);
 		moveBalls(device, &context, &program);
+		gettimeofday(&finish, NULL);
+        elapsed = (double)(finish.tv_sec - start.tv_sec);
+        elapsed += (double)(finish.tv_usec - start.tv_usec) / 1000000.0;
+        elapsed *= 1000;
+        addVal(times, elapsed, index);
+        if (index<maxTimingHist-1)
+            index++;
+        double tot = 0;
+        for (i = 0; i < index; i++)
+            tot += times[i];
+        sprintf(debug[1], "Avg time: %.5lfms", tot/(double)index);
 	}
 
 	// shut down curses

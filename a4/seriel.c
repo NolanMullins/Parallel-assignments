@@ -257,9 +257,8 @@ int main(int argc, char *argv[])
     initBalls();
 
     struct timeval start, finish;
-    int maxHist = 5;
     double elapsed;
-    double times[maxHist];
+    double times[maxTimingHist];
     int index = 0;
     memset(&times, 0, sizeof(times));
 
@@ -275,7 +274,7 @@ int main(int argc, char *argv[])
         elapsed += (double)(finish.tv_usec - start.tv_usec) / 1000000.0;
         elapsed *= 1000;
         addVal(times, elapsed, index);
-        if (index<maxHist-1)
+        if (index<maxTimingHist-1)
             index++;
         double tot = 0;
         for (i = 0; i < index; i++)
