@@ -49,6 +49,7 @@ float ballArray[POPSIZE][4];
 #define DEBUG_LOG 1
 #define DISPLAY 1
 char debug[32][256];
+int progInfo = 0;
 
 void initBalls()
 {
@@ -85,8 +86,8 @@ int drawBalls()
 		mvprintw((int)(ballArray[i][BY] * multy), (int)(ballArray[i][BX] * multx), "o");
 	}
 
-	if (DEBUG_LOG)
-		for (i = 0; i < 32; i++)
+	if (progInfo == 1)
+		for (i = 0; i < 2; i++)
 			mvprintw(i, 0, debug[i]);
 
 	refresh();
@@ -187,6 +188,9 @@ void addVal(double* arr, double val, int index)
 int main(int argc, char *argv[])
 {
 	int i, j, count;
+    
+    if (argc > 1 && strcmp(argv[1], "-d")==0)
+        progInfo = 1;
 
 	/* OpenCL structures */
 	cl_device_id device;
