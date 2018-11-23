@@ -1,5 +1,9 @@
 #include "data.h"
 
+float dotProduct(float x1, float y1, float x2, float y2);
+int ballCollision(float4 balli, float4 ballj);
+float2 resolveCollision(float i, float4 balli, float j, float4 ballj);
+
 // calculate the dot product between two vectors
 float dotProduct(float x1, float y1, float x2, float y2)
 {
@@ -8,8 +12,8 @@ float dotProduct(float x1, float y1, float x2, float y2)
 
 int ballCollision(float4 balli, float4 ballj)
 {
-	__local float distance;
-	__local float radiiSum;
+	float distance;
+	float radiiSum;
 
 	// Pythagorean distance
 	distance = sqrt(pow((balli.s0 - ballj.s0), 2) + pow((balli.s1 - ballj.s1), 2));
@@ -29,14 +33,14 @@ int ballCollision(float4 balli, float4 ballj)
 
 float2 resolveCollision(float i, float4 balli, float j, float4 ballj)
 {
-	__local float rvx, rvy;
-	__local float nx, ny;
-	__local float distance;
-	__local float vnormal;
-	__local float impulse;
- 	__local	float ix, iy;
+	float rvx, rvy;
+	float nx, ny;
+	float distance;
+	float vnormal;
+	float impulse;
+ 	float ix, iy;
 
-	__local float2 vel;
+	float2 vel;
 	vel.s0 = 0;
 	vel.s1 = 0;
 
